@@ -44,21 +44,32 @@ while True:
     port.write(struct.pack('BBBBB', 0xf0, 0xa2, 0x01, 0x01, 0x94))
     sleep(0.5)
     got = port.read_all()
-    if len(got) > 14:
+    if len(got) == 21:
         gota = struct.unpack('BBBBBBBBBBBBBBBBBBBBB', got)
-        print "%02d:%02d:%02d - RPM: % 3d - HF: % 3d - %s" % (gota[3]-1, gota[4]-1, gota[5]-1, gota[9]-1, gota[15]-1, str(gota[6:]))
+        time = "%02d:%02d:%02d:%02d" % (gota[2]-1, gota[3]-1, gota[4]-1, gota[5]-1)
+        speed = "V: % 3.1f km/h" % ((100*(gota[6]-1) + gota[7] -1) / 10.0)
+        rpm = "RPM: % 3d" % ((100*(gota[8]-1) + gota[9] -1))
+        distance = "D: % 3.1f km" % ((100*(gota[10]-1) + gota[11] -1) / 10.0)
+        calories = "% 3d kcal" % ((100*(gota[12]-1) + gota[13] -1))
+        hf = "HF % 3d" % ((100*(gota[14]-1) + gota[15] -1))
+        watt = "% 3.1f W" % ((100*(gota[16]-1) + gota[17] -1) / 10.0)
+        lvl = "L: %d" % (gota[18] -1)
+        print "%s - %s - %s - %s - %s - %s - %s - %s" % (time, speed, rpm, distance, calories, hf, watt, lvl)
 
 port.close()
-
-# 0 1 : 240 178
+# f0:b2   01:01:04:06 03:11     01:3b  01:07  01:0d   01:01  0f:33    09      02
+#           T: 3:05   21.0km/h  RPM58  D:0.6  cal 12  HF 0   W:1450   LVL8
+#
+# 0 1 : f0:b2
 # 2 3 4 5 : d:h:m:s
-# 6 7: unknown
+# 6 7: SPEED kmh * 10
 # 8 9: RPM
-# 10 11: unknown / calories?
-# 12 13: unknown / distance?
+# 10 11: distance in 10m
+# 12 13: calories
 # 14 15: HF
-# 16 17: unknown
-# 18 19: 2 2 - level?
+# 16 17: WATT * 10
+# 18: LVL
+# 19: ?
 # 20: checksum? sum of all fields?
 
 
