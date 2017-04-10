@@ -40,7 +40,7 @@
 #      357.7   83
 #      364.6   84   6.9 pro rpm
 
-import serial,struct
+import serial, struct, sys
 from time import sleep
 from binascii import hexlify
 
@@ -92,7 +92,7 @@ class GracefulInterruptHandler(object):
 
         return True
 
-def send_ack(packet, expect=None, plen=0):
+def send_ack(sig, packet, expect=None, plen=0):
     if expect == None:
         expect = 0xb0 | (ord(packet[1]) & 0xF)
 
@@ -102,6 +102,8 @@ def send_ack(packet, expect=None, plen=0):
     got = None
     while got == None:
         sleep(0.1)
+        if sig.interrupted:
+            exit_all(sig)
         port.read_all()
         port.write(packet)
         port.flush()
@@ -110,6 +112,8 @@ def send_ack(packet, expect=None, plen=0):
         while got == None and i < 6:
             i+=1
             sleep(0.1)
+            if sig.interrupted:
+                exit_all(sig)
             got = port.read_all()
             if len(got) == plen:
                 #print "<-" + hexlify(got)
@@ -123,6 +127,7 @@ def send_ack(packet, expect=None, plen=0):
         if got and len(got) >= 3 and got[0] == packet[0] and ord(got[1]) == expect:
             break
         got = None
+        print "---> Retransmit"
     return got
 
 def send_level(lvl):
@@ -130,45 +135,55 @@ def send_level(lvl):
     got = send_ack(packet)
     return got
 
+def exit_all(sig):
+    sig.interrupted = False
+    send_ack(sig, STOP)
+    print "STOP done"
+    send_ack(sig, PING)
+    print "ping done"
+    send_ack(sig, PING)
+    print "ping done"
+    port.close()
+    sys.exit(0)
 
 #send_level(10)
 
 i = 0
-with GracefulInterruptHandler() as h:
-    send_ack(PING)
+with GracefulInterruptHandler() as sig:
+    send_ack(sig, PING)
     print "ping done"
 
-    send_ack(INIT_A0, expect=0xb7, plen=6)
+    send_ack(sig, INIT_A0, expect=0xb7, plen=6)
     print "A0 done"
 
     for i in range(0, 5):
-        send_ack(PING)
+        send_ack(sig, PING)
         print "ping done"
 
-    send_ack(STATUS, plen=6)
+    send_ack(sig, STATUS, plen=6)
     print "status done"
 
-    send_ack(PING)
+    send_ack(sig, PING)
     print "ping done"
 
-    send_ack(INIT_A3)
+    send_ack(sig, INIT_A3)
     print "A3 done"
 
-    send_ack(INIT_A4)
+    send_ack(sig, INIT_A4)
     print "A4 done"
 
-    send_ack(START)
+    send_ack(sig, START)
     print "START done"
 
     while True:
-        if h.interrupted:
-            break
-        sleep(0.4)
+        if sig.interrupted:
+            exit_all(sig)
+        sleep(0.3)
         i+=1
         #    if i % 20 == 2:
         #        send_level((i/20) +1)
 
-        got = send_ack(READ, plen=21)
+        got = send_ack(sig, READ, plen=21)
         if len(got) == 21:
             gota = struct.unpack('BBBBBBBBBBBBBBBBBBBBB', got)
             time = "%02d:%02d:%02d:%02d" % (gota[2]-1, gota[3]-1, gota[4]-1, gota[5]-1)
