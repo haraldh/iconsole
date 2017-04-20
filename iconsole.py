@@ -45,8 +45,6 @@ from time import sleep
 from binascii import hexlify
 from ant.core import driver
 from ant.core import node
-from PowerMeterTx import PowerMeterTx
-from constants import *
 from bluetooth import *
 from ant.core import message
 from ant.core.constants import *
@@ -61,7 +59,6 @@ INIT_A4 = struct.pack('BBBBBBBBBBBBBBB', 0xf0, 0xa4, 0x01, 0x01, 0x01, 0x01, 0x0
 START = struct.pack('BBBBBB', 0xf0, 0xa5, 0x01, 0x01, 0x02, 0x99)
 STOP = struct.pack('BBBBBB', 0xf0, 0xa5, 0x01, 0x01, 0x04, 0x9b)
 READ = struct.pack('BBBBB', 0xf0, 0xa2, 0x01, 0x01, 0x94)
-POWER_SENSOR_ID = int(int(hashlib.md5(getserial()).hexdigest(), 16) & 0xfffe) + 1
 DEBUG = False
 LOG = None
 NETKEY = '\xB9\xA5\x21\xFB\xBD\x72\xC3\x45'
@@ -89,6 +86,8 @@ def getserial():
         cpuserial = "ERROR000000000"
 
     return cpuserial
+
+POWER_SENSOR_ID = int(int(hashlib.md5(getserial()).hexdigest(), 16) & 0xfffe) + 1
 
 # Transmitter for Bicycle Power ANT+ sensor
 class PowerMeterTx(object):
@@ -277,7 +276,7 @@ def main(win):
     level = 1
 
     while True:
-        sleep(0.3)
+        sleep(0.25)
         while True:
             key = win.getch()
             if key == ord('q'):
@@ -299,6 +298,7 @@ def main(win):
         got = send_ack(READ, plen=21)
         if len(got) == 21:
             ic = IConsole(got)
+            power_meter.update(power = ic.power, cadence = ic.rpm)
             win.addstr(0,0, "%s - %s - %s - %s - %s - %s - %s - %s" % (ic.time_str,
                                                              ic.speed_str,
                                                              ic.rpm_str,
@@ -309,11 +309,10 @@ def main(win):
                                                              ic.lvl_str))
             win.clrtoeol()
             win.refresh()
-            power_meter.update(power = ic.power, cadence = ic.rpm)
 
 if  __name__ =='__main__':
     sock = btcon()
-    stick = driver.USB1Driver(device="/dev/ttyUSB0", log=LOG, debug=DEBUG)
+    stick = driver.USB1Driver(device="/dev/ttyANT", log=LOG, debug=DEBUG)
     antnode = node.Node(stick)
     print("Starting ANT node")
     antnode.start()
