@@ -46,9 +46,9 @@ from binascii import hexlify
 from ant.core import driver
 from ant.core import node
 from bluetooth import *
-from ant.core import message
-from ant.core.constants import *
-from ant.core.exceptions import ChannelError
+from PowerMeterTx import PowerMeterTx
+from SpeedTx import SpeedTx
+from const import *
 
 INIT_A0 = struct.pack('BBBBB', 0xf0, 0xa0, 0x02, 0x02, 0x94)
 PING = struct.pack('BBBBB', 0xf0, 0xa0, 0x01, 0x01, 0x92)
@@ -61,91 +61,11 @@ STOP = struct.pack('BBBBBB', 0xf0, 0xa5, 0x01, 0x01, 0x04, 0x9b)
 READ = struct.pack('BBBBB', 0xf0, 0xa2, 0x01, 0x01, 0x94)
 DEBUG = False
 LOG = None
-NETKEY = '\xB9\xA5\x21\xFB\xBD\x72\xC3\x45'
 power_meter = None
-
-SPEED_DEVICE_TYPE = 0x7B
-CADENCE_DEVICE_TYPE = 0x7A
-SPEED_CADENCE_DEVICE_TYPE = 0x79
-POWER_DEVICE_TYPE = 0x0B
-
-VPOWER_DEBUG = False
-CHANNEL_PERIOD = 8182
-
-# Get the serial number of Raspberry Pi
-def getserial():
-    # Extract serial from cpuinfo file
-    cpuserial = "0000000000000000"
-    try:
-        f = open('/proc/cpuinfo', 'r')
-        for line in f:
-            if line[0:6] == 'Serial':
-                cpuserial = line[10:26]
-        f.close()
-    except:
-        cpuserial = "ERROR000000000"
-
-    return cpuserial
+speed = None
 
 POWER_SENSOR_ID = int(int(hashlib.md5(getserial()).hexdigest(), 16) & 0xfffe) + 1
-
-# Transmitter for Bicycle Power ANT+ sensor
-class PowerMeterTx(object):
-    class PowerData:
-        def __init__(self):
-            self.eventCount = 0
-            self.eventTime = 0
-            self.cumulativePower = 0
-            self.instantaneousPower = 0
-
-    def __init__(self, antnode, sensor_id):
-        self.antnode = antnode
-
-        # Get the channel
-        self.channel = antnode.getFreeChannel()
-        try:
-            self.channel.name = 'C:POWER'
-            self.channel.assign('N:ANT+', CHANNEL_TYPE_TWOWAY_TRANSMIT)
-            self.channel.setID(POWER_DEVICE_TYPE, sensor_id, 0)
-            self.channel.setPeriod(8182)
-            self.channel.setFrequency(57)
-        except ChannelError as e:
-            print "Channel config error: "+e.message
-        self.powerData = PowerMeterTx.PowerData()
-
-    def open(self):
-        self.channel.open()
-
-    def close(self):
-        self.channel.close()
-
-    def unassign(self):
-        self.channel.unassign()
-
-    # Power was updated, so send out an ANT+ message
-    def update(self, power, cadence):
-        if VPOWER_DEBUG: print 'PowerMeterTx: update called with power ', power
-        self.powerData.eventCount = (self.powerData.eventCount + 1) & 0xff
-        if VPOWER_DEBUG: print 'eventCount ', self.powerData.eventCount
-        self.powerData.cumulativePower = (self.powerData.cumulativePower + int(power)) & 0xffff
-        if VPOWER_DEBUG: print 'cumulativePower ', self.powerData.cumulativePower
-        self.powerData.instantaneousPower = int(power)
-        if VPOWER_DEBUG: print 'instantaneousPower ', self.powerData.instantaneousPower
-
-        payload = chr(0x10)  # standard power-only message
-        payload += chr(self.powerData.eventCount)
-        payload += chr(0xFF)  # Pedal power not used
-        payload += chr(cadence)
-        payload += chr(self.powerData.cumulativePower & 0xff)
-        payload += chr(self.powerData.cumulativePower >> 8)
-        payload += chr(self.powerData.instantaneousPower & 0xff)
-        payload += chr(self.powerData.instantaneousPower >> 8)
-
-        ant_msg = message.ChannelBroadcastDataMessage(self.channel.number, data=payload)
-        #sys.stdout.write('+')
-        #sys.stdout.flush()
-        if VPOWER_DEBUG: print 'Write message to ANT stick on channel ' + repr(self.channel.number)
-        self.antnode.driver.write(ant_msg.encode())
+SPEED_SENSOR_ID = int(int(hashlib.md5(getserial()).hexdigest(), 16) & 0xfffe) + 2
 
 class IConsole(object):
     def __init__(self, got):
@@ -299,6 +219,7 @@ def main(win):
         if len(got) == 21:
             ic = IConsole(got)
             power_meter.update(power = ic.power, cadence = ic.rpm)
+            speed.update(ic.speed)
             win.addstr(0,0, "%s - %s - %s - %s - %s - %s - %s - %s" % (ic.time_str,
                                                              ic.speed_str,
                                                              ic.rpm_str,
@@ -311,7 +232,6 @@ def main(win):
             win.refresh()
 
 if  __name__ =='__main__':
-    sock = btcon()
     stick = driver.USB1Driver(device="/dev/ttyANT", log=LOG, debug=DEBUG)
     antnode = node.Node(stick)
     print("Starting ANT node")
@@ -328,6 +248,16 @@ if  __name__ =='__main__':
         print("power_meter error: " + e.message)
         power_meter = None
 
+    print("Starting speed sensor with ANT+ ID " + repr(SPEED_SENSOR_ID))
+    try:
+        speed = SpeedTx(antnode, SPEED_SENSOR_ID, wheel = 0.1)
+        speed.open()
+    except Exception as e:
+        print("speed error: " + e.message)
+        speed = None
+
+    sock = btcon()
+
     curses.wrapper(main)
 
     if sock:
@@ -335,6 +265,10 @@ if  __name__ =='__main__':
         send_ack(PING)
         sock.close()
 
+    if speed:
+        print "Closing speed sensor"
+        speed.close()
+        speed.unassign()
     if power_meter:
         print "Closing power meter"
         power_meter.close()
