@@ -5,7 +5,7 @@ from ant.core.exceptions import ChannelError
 
 from constants import *
 
-VPOWER_DEBUG = True
+VPOWER_DEBUG = False
 CHANNEL_PERIOD = 8182
 
 
@@ -62,7 +62,7 @@ class PowerMeterTx(object):
         payload += chr(self.powerData.instantaneousPower >> 8)
 
         ant_msg = message.ChannelBroadcastDataMessage(self.channel.number, data=payload)
-        sys.stdout.write('+')
-        sys.stdout.flush()
+        #sys.stdout.write('+')
+        #sys.stdout.flush()
         if VPOWER_DEBUG: print 'Write message to ANT stick on channel ' + repr(self.channel.number)
         self.antnode.driver.write(ant_msg.encode())
