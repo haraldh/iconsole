@@ -1,20 +1,21 @@
 import serial, struct, sys, hashlib, curses
 from time import sleep
-from binascii import hexlify
+from binascii import hexlify,unhexlify
 from ant.core import driver
 from ant.core import node
 from bluetooth import *
 from SpeedTx import SpeedTx
-from const import *
+from iConst import *
 
 speed = None
 
 SPEED_SENSOR_ID = int(int(hashlib.md5(getserial()).hexdigest(), 16) & 0xfffe) + 2
 
 if  __name__ =='__main__':
+    NETKEY = unhexlify(sys.argv[1])
     stick = driver.USB1Driver(device="/dev/ttyANT", log=None, debug=True)
     antnode = node.Node(stick)
-    print("Starting ANT node")
+    print("Starting ANT node on network %s" % sys.argv[1])
     antnode.start()
     key = node.NetworkKey('N:ANT+', NETKEY)
     antnode.setNetworkKey(0, key)

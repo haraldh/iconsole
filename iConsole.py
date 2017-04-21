@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # f0:b2   01:01:04:06 03:11     01:3b  01:07  01:0d   01:01  0f:33    09      02
 #           T: 3:05   21.0km/h  RPM58  D:0.6  cal 12  HF 0   W:1450   LVL8
 #
@@ -42,13 +44,13 @@
 
 import serial, struct, sys, hashlib, curses
 from time import sleep
-from binascii import hexlify
+from binascii import hexlify,unhexlify
 from ant.core import driver
 from ant.core import node
 from bluetooth import *
 from PowerMeterTx import PowerMeterTx
 from SpeedTx import SpeedTx
-from const import *
+from iConst import *
 
 INIT_A0 = struct.pack('BBBBB', 0xf0, 0xa0, 0x02, 0x02, 0x94)
 PING = struct.pack('BBBBB', 0xf0, 0xa0, 0x01, 0x01, 0x92)
@@ -232,9 +234,10 @@ def main(win):
             win.refresh()
 
 if  __name__ =='__main__':
+    NETKEY = unhexlify(sys.argv[1])
     stick = driver.USB1Driver(device="/dev/ttyANT", log=LOG, debug=DEBUG)
     antnode = node.Node(stick)
-    print("Starting ANT node")
+    print("Starting ANT node on network %s" % sys.argv[1])
     antnode.start()
     key = node.NetworkKey('N:ANT+', NETKEY)
     antnode.setNetworkKey(0, key)

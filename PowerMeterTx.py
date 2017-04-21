@@ -1,7 +1,7 @@
 from ant.core import message
 from ant.core.constants import *
 from ant.core.exceptions import ChannelError
-from const import *
+from iConst import *
 import thread
 from binascii import hexlify
 import struct
