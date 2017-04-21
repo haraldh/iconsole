@@ -68,7 +68,7 @@ class SpeedTx(object):
         self.data_lock.acquire()
         if self.lastTime != 0:
             way = self.speed * (now - self.lastTime) / 3.6 + self.remWay
-            rev = int( way / self.wheel )
+            rev = int( way / self.wheel + 0.5 )
             self.remWay = way - rev * self.wheel
             self.data.revCounts += rev
         self.lastTime = now
