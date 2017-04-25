@@ -85,20 +85,20 @@ class PowerMeterTx(object):
             payload += chr(0xFF)
             payload += chr(0xFF)
             payload += chr(0x01) # HW Rev
-            payload += chr(0xFF)
-            payload += chr(0x00)
-            payload += chr(0x01)
-            payload += chr(0x00)
+            payload += chr(0xFF) # MID LSB
+            payload += chr(0x00) # MID MSB
+            payload += chr(0x01) # Model LSB
+            payload += chr(0x00) # Model MSB
 
         elif self.powerData.i % 121 == 60:
             payload = chr(0x51)  # Product Info
             payload += chr(0xFF)
             payload += chr(0xFF) # SW Rev Supp
             payload += chr(0x01) # SW Rev Main
+            payload += chr(0xFF) # Serial 0-7
             payload += chr(0xFF)
             payload += chr(0xFF)
-            payload += chr(0xFF)
-            payload += chr(0xFF)
+            payload += chr(0xFF) # Serial 24-31
         else:
             self.data_lock.acquire()
             power = self.power
