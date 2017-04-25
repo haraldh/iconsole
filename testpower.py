@@ -9,7 +9,7 @@ from iConst import *
 
 power_meter = None
 
-POWER_SENSOR_ID = int(int(hashlib.md5(getserial()).hexdigest(), 16) & 0xfffe) + 1
+POWER_SENSOR_ID = int(int(hashlib.md5(getserial()).hexdigest(), 16) & 0xFFFFfffe) + 1
 
 if  __name__ =='__main__':
     NETKEY = unhexlify(sys.argv[1])

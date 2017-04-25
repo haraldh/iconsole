@@ -25,13 +25,14 @@ class PowerMeterTx(object):
         self.antnode = antnode
         self.power = 0
         self.cadence = 0
+        self.sensor_id = sensor_id
 
         # Get the channel
         self.channel = antnode.getFreeChannel()
         try:
             self.channel.name = 'C:POWER'
             self.channel.assign('N:ANT+', CHANNEL_TYPE_TWOWAY_TRANSMIT)
-            self.channel.setID(POWER_DEVICE_TYPE, sensor_id, 0)
+            self.channel.setID(POWER_DEVICE_TYPE, sensor_id & 0xFFFF, 5)
             self.channel.setPeriod(8182)
             self.channel.setFrequency(57)
         except ChannelError as e:
@@ -80,7 +81,7 @@ class PowerMeterTx(object):
     # Power was updated, so send out an ANT+ message
     def broadcast(self):
         self.powerData.i += 1
-        if self.powerData.i % 121 == 30:
+        if self.powerData.i % 61 == 15:
             payload = chr(0x50)  # Manufacturer's Info
             payload += chr(0xFF)
             payload += chr(0xFF)
@@ -90,23 +91,25 @@ class PowerMeterTx(object):
             payload += chr(0x01) # Model LSB
             payload += chr(0x00) # Model MSB
 
-        elif self.powerData.i % 121 == 60:
+        elif self.powerData.i % 61 == 30:
             payload = chr(0x51)  # Product Info
             payload += chr(0xFF)
             payload += chr(0xFF) # SW Rev Supp
             payload += chr(0x01) # SW Rev Main
-            payload += chr(0xFF) # Serial 0-7
-            payload += chr(0xFF)
-            payload += chr(0xFF)
-            payload += chr(0xFF) # Serial 24-31
+            payload += chr((self.sensor_id >>  0)& 0xFF) # Serial 0-7
+            payload += chr((self.sensor_id >>  8)& 0xFF) # Serial 8-15
+            payload += chr((self.sensor_id >> 16)& 0xFF) # Serial 16-23
+            payload += chr((self.sensor_id >> 24)& 0xFF) # Serial 24-31
         else:
             self.data_lock.acquire()
             power = self.power
             cadence = self.cadence
             self.data_lock.release()
+
             self.powerData.eventCount = (self.powerData.eventCount + 1) & 0xff
             self.powerData.cumulativePower = (self.powerData.cumulativePower + int(power)) & 0xffff
             self.powerData.instantaneousPower = int(power)
+
             payload = chr(0x10)  # standard power-only message
             payload += chr(self.powerData.eventCount)
             payload += chr(0xFF)  # Pedal power not used

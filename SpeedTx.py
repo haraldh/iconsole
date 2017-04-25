@@ -20,7 +20,7 @@ class SpeedTx(object):
             self.ucMessageCount = 0
             self.ulRunTime = 0
             self.ucPageChange = 0
-            self.ucExtMesgType = 0
+            self.ucExtMesgType = 1
 
     def __init__(self, antnode, sensor_id, wheel = 0.100):
         self.antnode = antnode
@@ -28,12 +28,13 @@ class SpeedTx(object):
         self.lastTime = 0
         self.wheel = wheel
         self.remWay = 0
+        self.sensor_id = sensor_id
         # Get the channel
         self.channel = antnode.getFreeChannel()
         try:
             self.channel.name = 'C:SPEED'
             self.channel.assign('N:ANT+', CHANNEL_TYPE_TWOWAY_TRANSMIT)
-            self.channel.setID(SPEED_DEVICE_TYPE, sensor_id, 0)
+            self.channel.setID(SPEED_DEVICE_TYPE, sensor_id & 0xFFFF, 1)
             self.channel.setPeriod(8118)
             self.channel.setFrequency(57)
         except ChannelError as e:
@@ -64,8 +65,8 @@ class SpeedTx(object):
             self.broadcast()
 
     def broadcast(self):
-        now = time.time()
         self.data_lock.acquire()
+        now = time.time()
         if self.lastTime != 0:
             way = self.speed * (now - self.lastTime) / 3.6 + self.remWay
             rev = int( way / self.wheel + 0.5 )
@@ -73,34 +74,36 @@ class SpeedTx(object):
             self.data.revCounts += rev
         self.lastTime = now
         self.data_lock.release()
-        #print "Rev: %d Way: %f" % (rev, way)
 
         self.data.ucPageChange += 0x20;
         self.data.ucPageChange &= 0xF0;
 
         self.data.ucMessageCount += 1
+
         if self.data.ucMessageCount >= 65:
-            self.data.ucMessageCount = 0
-            self.data.ucExtMesgType += 1
             if self.data.ucExtMesgType >= 4:
                 self.data.ucExtMesgType = 1
 
             if self.data.ucExtMesgType == 1:
-                ulElapsedTime2 = int(now/2)
-                payload = chr(0x01)
+                ulElapsedTime2 = int(now/2.0)
+                payload = chr(0x01 | (self.data.ucPageChange & 0x80))
+                payload += chr((ulElapsedTime2) & 0xFF)
                 payload += chr((ulElapsedTime2 >> 8) & 0xFF)
                 payload += chr((ulElapsedTime2 >> 16) & 0xFF)
-                payload += chr((ulElapsedTime2 >> 24) & 0xFF)
             elif self.data.ucExtMesgType == 2:
-                payload = chr(0x02)
-                payload += chr(0x02)
-                payload += chr(0xFE)
-                payload += chr(0x21)
+                payload = chr(0x02 | (self.data.ucPageChange & 0x80))
+                payload += chr(0xFF) # MID
+                payload += chr((self.sensor_id >> 16)& 0xFF) # Serial 17-24
+                payload += chr((self.sensor_id >> 24) & 0xFF) # Serial 25-32
             elif self.data.ucExtMesgType == 3:
-                payload = chr(0x03)
-                payload += chr(0x01)
-                payload += chr(0x01)
-                payload += chr(0x01)
+                payload = chr(0x03 | (self.data.ucPageChange & 0x80))
+                payload += chr(0x01) # HW
+                payload += chr(0x01) # SW
+                payload += chr(0x01) # Model
+
+            if self.data.ucMessageCount >= 68:
+                self.data.ucMessageCount = 0
+                self.data.ucExtMesgType += 1
         else:
             payload = chr(self.data.ucPageChange & 0x80)
             payload += chr(0xFF)
