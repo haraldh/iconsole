@@ -3,6 +3,8 @@ Reverse engineering of the iconsole+ bike computer serial protocol.
 
 Broadcasts the power and speed on the ANT network.
 
+See also my android app [OpeniConsole](https://github.com/haraldh/iconsole-android).
+
 ## Requirements
 
 ```
